@@ -6,24 +6,24 @@
 void print(void *buf);
 
 int main(int argc, char *argv[]) {
-    int parent_to_child_fd[2];
-    int child_to_parent_fd[2];
+    int parent_fd[2];
+    int child_fd[2];
 
-    pipe(parent_to_child_fd);
-    pipe(child_to_parent_fd);
+    pipe(parent_fd);
+    pipe(child_fd);
 
     if (fork()) {
         // Parent
-        write(parent_to_child_fd[1], "ping", 4);
+        write(parent_fd[1], "ping", 4);
         char buf[SIZE];
-        read(child_to_parent_fd[0], buf, sizeof(buf));
+        read(child_fd[0], buf, sizeof(buf));
         print(buf);
     } else {
         // Child
         char buf[SIZE];
-        read(parent_to_child_fd[0], buf, sizeof(buf));
+        read(parent_fd[0], buf, sizeof(buf));
         print(buf);
-        write(child_to_parent_fd[1], "pong", 4);
+        write(child_fd[1], "pong", 4);
     }
     exit(0);
 }

@@ -1,53 +1,51 @@
-#include "kernel/types.h"
 #include "kernel/param.h"
+#include "kernel/types.h"
 #include "user/user.h"
 
-int update_args(int argc, char* argv[]);
-void execute(int count, char* args[]);
+void execute(char *s[]);
+int main(int argc, char* argv[]){
+    int status=1;
+    while(status){
+        char *s[MAXARG];
+        int count=0;
+        char c,buf[512],*p;
+        p= buf;
 
-int main(int argc, char* argv[]) {
-    while (update_args(argc, argv))
-        ;
+        for(int i=1; i<argc ; i++){
+            s[i-1]=argv[i];
+            count++;
+        }
+
+        while((status =read(0,&c,sizeof(c)))){
+            
+            if(c=='\n'){
+                *p++='\0';
+                s[count] = (char *)malloc(sizeof(buf));
+                memcpy(s[count],&buf,sizeof(buf));
+                count++;
+                execute(s);
+                break;
+            }
+            if(c==' '){
+                *p++='\0';
+                s[count] = (char *)malloc(sizeof(buf));
+                memcpy(s[count],&buf,sizeof(buf));
+                count++;
+                p=buf;
+                continue;
+            }
+            *p++=c;
+        }
+    }
+    
+    
     exit(0);
 }
 
-int update_args(int argc, char* argv[]) {
-    char* args[MAXARG];
-    int i;
-    int len = 0;
-    for (i = 1; i < argc; i++, len++) {
-        args[len] = argv[i];
-    }
-    char c;
-    char buf[512];
-    char* arg = buf;
-    int ret_val;
-    while ((ret_val = read(0, &c, sizeof(c))) == sizeof(c)) {
-        if (c == '\n') {
-            *arg++ = '\0';
-            args[len] = (char*)malloc(sizeof(buf));
-            strcpy(args[len], buf);
-            len++;
-            execute(len, args);
-            break;
-        }
-        if (c == ' ') {
-            *arg++ = '\0';
-            args[len] = (char*)malloc(sizeof(buf));
-            strcpy(args[len], buf);
-            len++;
-            arg = buf;
-            continue;
-        }
-        *arg++ = c;
-    }
-    return ret_val;
-}
-
-void execute(int count, char* args[]) {
-    if (fork()) {
+void execute(char *s[]){
+    if(fork()){
         wait(0);
-    } else {
-        exec(args[0], args);
+    }else{
+        exec(s[0],s);
     }
 }

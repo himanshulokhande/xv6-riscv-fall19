@@ -5,6 +5,8 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+#include "spinlock.h"
+#include "proc.h"
 
 /*
  * the kernel's page table.
@@ -17,6 +19,7 @@ extern char trampoline[]; // trampoline.S
 
 void print(pagetable_t);
 
+void vmprint(pagetable_t, int);
 /*
  * create a direct-map page table for the kernel and
  * turn on paging. called early, in supervisor mode.
@@ -188,18 +191,24 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 size, int do_free)
   last = PGROUNDDOWN(va + size - 1);
   for(;;){
     if((pte = walk(pagetable, a, 0)) == 0)
-      panic("uvmunmap: walk");
+      goto next;
+      //panic("uvmunmap: walk");
+      
     if((*pte & PTE_V) == 0){
-      printf("va=%p pte=%p\n", a, *pte);
-      panic("uvmunmap: not mapped");
+      //printf("%d PTE_V \n",PTE_V);
+      //printf("va=%p pte=%p\n", a, *pte);
+      //panic("uvmunmap: not mapped");
+      goto next;
     }
     if(PTE_FLAGS(*pte) == PTE_V)
-      panic("uvmunmap: not a leaf");
+      //panic("uvmunmap: not a leaf");
+      goto next;
     if(do_free){
       pa = PTE2PA(*pte);
       kfree((void*)pa);
     }
     *pte = 0;
+    next:
     if(a == last)
       break;
     a += PGSIZE;
@@ -295,6 +304,7 @@ freewalk(pagetable_t pagetable)
       freewalk((pagetable_t)child);
       pagetable[i] = 0;
     } else if(pte & PTE_V){
+      printf("%p pte \n",pte);
       panic("freewalk: leaf");
     }
   }
@@ -326,9 +336,11 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
-      panic("uvmcopy: pte should exist");
+      //panic("uvmcopy: pte should exist");
+      continue;
     if((*pte & PTE_V) == 0)
-      panic("uvmcopy: page not present");
+      //panic("uvmcopy: page not present");
+      continue;
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
     if((mem = kalloc()) == 0)
@@ -449,5 +461,36 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
     return 0;
   } else {
     return -1;
+  }
+}
+
+void print(pagetable_t pagetable){
+  printf("page table %p \n",pagetable); //prints address of argument
+  vmprint(pagetable,0);
+}
+
+void vmprint(pagetable_t pagetable, int level){
+  int count =level+1;
+  for(int i=0; i<512; i++){ //since PTE has 2^9 bits
+    pte_t pte = pagetable[i];
+    if((pte & PTE_V && (pte & (PTE_R|PTE_W|PTE_X)) == 0)){
+      //PTE has lower level page table
+      while(count>0){
+        printf(".. ");
+        count--;
+      }
+      count=level+1;
+      uint64 pa = PTE2PA(pte); //obtains physical address
+      printf(" %d pte : %p pa : %p\n",i,pte, pa);
+      vmprint((pagetable_t)pa,level+1);
+    }else if(pte & PTE_V){
+      //PTE does not have lower level page table
+      while(count>0){
+        printf(".. ");
+        count--;
+      }
+      count=level+1;
+      printf(" %d pte : %p pa : %p\n",i,pte, PTE2PA(pte));
+    }
   }
 }

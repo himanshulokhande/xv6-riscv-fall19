@@ -1335,8 +1335,8 @@ bigfile(char *s)
   enum { N = 20, SZ=600 };
   int fd, i, total, cc;
 
-  unlink("bigfile");
-  fd = open("bigfile", O_CREATE | O_RDWR);
+  unlink("bigfile.test");
+  fd = open("bigfile.test", O_CREATE | O_RDWR);
   if(fd < 0){
     printf("%s: cannot create bigfile", s);
     exit(1);
@@ -1350,7 +1350,7 @@ bigfile(char *s)
   }
   close(fd);
 
-  fd = open("bigfile", 0);
+  fd = open("bigfile.test", 0);
   if(fd < 0){
     printf("%s: cannot open bigfile\n", s);
     exit(1);
@@ -1379,7 +1379,7 @@ bigfile(char *s)
     printf("%s: read bigfile wrong total\n", s);
     exit(1);
   }
-  unlink("bigfile");
+  unlink("bigfile.test");
 }
 
 void
@@ -1647,6 +1647,7 @@ sbrkmuch(char *s)
   // can one de-allocate?
   a = sbrk(0);
   c = sbrk(-PGSIZE);
+  printf("%d \n",c);
   if(c == (char*)0xffffffffffffffffL){
     printf("%s: sbrk could not deallocate\n", s);
     exit(1);
@@ -1990,6 +1991,7 @@ sbrkbugs(char *s)
   }
   if(pid == 0){
     int sz = (uint64) sbrk(0);
+    
     // free all user memory; there used to be a bug that
     // would not adjust p->sz correctly in this case,
     // causing exit() to panic.
@@ -2006,6 +2008,7 @@ sbrkbugs(char *s)
   }
   if(pid == 0){
     int sz = (uint64) sbrk(0);
+    
     // set the break to somewhere in the very first
     // page; there used to be a bug that would incorrectly
     // free the first page.
@@ -2146,7 +2149,7 @@ main(int argc, char *argv[])
     {bigargtest, "bigargtest"},
     {bigwrite, "bigwrite"},
     {bsstest, "bsstest"},
-    // {sbrkbasic, "sbrkbasic"},
+    {sbrkbasic, "sbrkbasic"},
     {sbrkmuch, "sbrkmuch"},
     {kernmem, "kernmem"},
     {sbrkfail, "sbrkfail"},
@@ -2160,7 +2163,7 @@ main(int argc, char *argv[])
     {openiputtest, "openiput"},
     {exitiputtest, "exitiput"},
     {iputtest, "iput"},
-    // {mem, "mem"},
+    {mem, "mem"},
     {pipe1, "pipe1"},
     {preempt, "preempt"},
     {exitwait, "exitwait"},

@@ -1,71 +1,69 @@
 #include "kernel/types.h"
 #include "kernel/fs.h"
-#include "kernel/stat.h"
 #include "user/user.h"
+#include "kernel/stat.h"
 
-#define BUF_SIZE 512
+int find_file(char *dir, char *fname);
 
-int find_in_dir(char* dir, char* search);
-
-int main(int argc, char* argv[]) {
-    if (argc != 3) {
-        fprintf(2, "usage is find <directory> <search>\n");
-        exit(1);
-    }
-
-    int status = find_in_dir(argv[1], argv[2]);
-    exit(status);
+int main(int argc, char *argv[]){
+	int status=-1;
+	if(argc!=3){
+		printf("usage: <directory> <filename>\n");
+		exit(status);
+	}else{
+		find_file(argv[1],argv[2]);
+	}
+	exit(status);
 }
 
-int find_in_dir(char* dir, char* search) {
-    int fd;
-    struct stat status;
-    struct dirent entry;
+int find_file(char *dir, char *fname){
+	char buf[512],*p;
+	int fd;
+	struct dirent de;
+	struct stat fst;
 
-    if ((fd = open(dir, 0)) < 0) {
-        fprintf(2, "Cannot open the Directory %s\n", dir);
-        return 1;
-    }
-
-    if (fstat(fd, &status) < 0) {
-        fprintf(2, "Cannot get the status of %s", dir);
-        close(fd);
-        return 1;
-    }
-
-    if (status.type != T_DIR) {
-        fprintf(2, "Invalid directory");
-        close(fd);
-        return 1;
-    }
-
-    // reading the entries in the directory
-    char path[BUF_SIZE], *p;
-    strcpy(path, dir);
-    p = path + strlen(path);
+	fd=open(dir,0);
+	//error checking for reading 
+	if(fd < 0){
+		fprintf(2, "Error opening path\n");
+		return 1;
+	}
+		
+	strcpy(buf,dir);
+	p = buf+strlen(buf);
     *p++ = '/';
-    while (read(fd, &entry, sizeof(entry)) == sizeof(entry)) {
-        if (entry.inum == 0) continue;
-        if (strcmp(entry.name, ".") == 0 || strcmp(entry.name, "..") == 0)
-            continue;
-        memmove(p, entry.name, DIRSIZ);
-        if (stat(path, &status) < 0) {
-            fprintf(2, "cannot get the status of %s\n", entry.name);
-            continue;
-        }
-        switch (status.type) {
-            case T_FILE: {
-                if (strcmp(entry.name, search) == 0) {
-                    printf("%s\n", path);
-                }
-                break;
-            }
-            case T_DIR: {
-                find_in_dir(path, search);
-                break;
-            }
-        }
-    }
-    close(fd);
-    return 0;
+	while(read(fd,&de,sizeof(de))==sizeof(de)){
+			
+		if(de.inum==0){
+			continue;
+		}
+		if(!strcmp(de.name,".") || !strcmp(de.name,"..")){
+			continue;
+		}
+		memmove(p,de.name,sizeof(de.name));
+		
+		//error checking on checking stats
+		if(stat(buf,&fst)<0){
+			fprintf(2, "Error retrieving file status");
+			close(fd);
+			return 1;
+		}
+		switch (fst.type)
+		{
+		case T_FILE:
+			if(strcmp(de.name,fname)==0){
+				printf("%s \n",buf);
+			}
+			break;
+		
+		case T_DIR:
+			find_file(buf,fname);
+			break;
+		}
+		
+		
+	}
+	close(fd);
+
+	return 0;
 }

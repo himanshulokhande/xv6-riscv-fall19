@@ -10,41 +10,41 @@ int main(int argc, char* argv[]) {
     int fd[2];
     pipe(fd);
     if (fork()) {
+        // Parent
         redirect(1, fd);
         source();
-        close(1);
-        wait(NULL);
     } else {
+        // Child
         redirect(0, fd);
         sieve();
     }
     exit(0);
 }
 
-// sieve is used to filter out the numbers which are divisible by the current
-// number and create a new process for each prime number
 void sieve() {
     int n;
     read(0, &n, sizeof(n));
     if (n != 0) {
-        printf("Prime %d \n", n);
+        printf("%d: Prime %d \n", getpid(), n);
         int fd[2];
-        if (pipe(fd) < 0) {
+        int z = pipe(fd);
+        if (z < 0) {
+            // fprintf(2, "error in creating pipe in sieve %d\n", n);
             return;
+        } else {
+            // fprintf(2, "sucessfully created pipe in sieve %d\n", n);
         }
-        int id = fork();
-        if (id < 0) {
-            fprintf(2, "failed to create a new process in sieve %d \n", n);
-            return;
-        }
-        if (id > 0) {
+        if (fork()) {
             redirect(1, fd);
             for (;;) {
                 int p;
-                if (read(0, &p, sizeof(p)) <= 0) {
-                    break;
+                int x = read(0, &p, sizeof(p));
+                if (x <= 0) {
+                    // fprintf(2, "error reading in sieve %d\n", n);
+                    return;
                 }
                 if (p % n != 0) {
+                    // fprintf(2, "writing %d in sieve %d\n", p, n);
                     write(1, &p, sizeof(p));
                 }
             }
@@ -55,16 +55,13 @@ void sieve() {
     }
 }
 
-// generates numbers from 2 to 35 and writes it to stdout
 void source() {
     int n;
-    for (n = 2; n <= 35; n++) {
+    for (n = 2; n < 100; n++) {
         write(1, &n, sizeof(n));
     }
 }
 
-// replaces the file descriptor in the pipe with the new file descriptor(which
-// is either 0 or 1) and closes the old file descriptors
 void redirect(int new_fd, int pipe[2]) {
     close(new_fd);
     dup(pipe[new_fd]);

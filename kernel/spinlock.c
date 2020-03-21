@@ -87,12 +87,13 @@ release(struct spinlock *lk)
 }
 
 // Check whether this cpu is holding the lock.
-// Must be called with interrupts off.
 int
 holding(struct spinlock *lk)
 {
   int r;
+  push_off();
   r = (lk->locked && lk->cpu == mycpu());
+  pop_off();
   return r;
 }
 
@@ -104,8 +105,8 @@ void
 push_off(void)
 {
   int old = intr_get();
-  if(old)
-    intr_off();
+
+  intr_off();
   if(mycpu()->noff == 0)
     mycpu()->intena = old;
   mycpu()->noff += 1;
@@ -114,12 +115,12 @@ push_off(void)
 void
 pop_off(void)
 {
+  struct cpu *c = mycpu();
   if(intr_get())
     panic("pop_off - interruptible");
-  struct cpu *c = mycpu();
-  if(c->noff < 1)
-    panic("pop_off");
   c->noff -= 1;
+  if(c->noff < 0)
+    panic("pop_off");
   if(c->noff == 0 && c->intena)
     intr_on();
 }
@@ -128,7 +129,7 @@ void
 print_lock(struct spinlock *lk)
 {
   if(lk->n > 0) 
-    printf("lock: %s: #test-and-set %d #acquire() %d\n", lk->name, lk->nts, lk->n);
+    printf("lock: %s: #fetch-and-add %d #acquire() %d\n", lk->name, lk->nts, lk->n);
 }
 
 uint64
@@ -145,7 +146,6 @@ sys_ntas(void)
       if(locks[i] == 0)
         break;
       locks[i]->nts = 0;
-      locks[i]->n = 0;
     }
     return 0;
   }

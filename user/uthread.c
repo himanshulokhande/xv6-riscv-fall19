@@ -11,6 +11,7 @@
 #define MAX_THREAD  4
 
 struct thread {
+  uint64     sp;                /* top of stack*/
   char       stack[STACK_SIZE]; /* the thread's stack */
   int        state;             /* FREE, RUNNING, RUNNABLE */
 };
@@ -38,6 +39,7 @@ thread_schedule(void)
   /* Find another runnable thread. */
   next_thread = 0;
   t = current_thread + 1;
+  
   for(int i = 0; i < MAX_THREAD; i++){
     if(t >= all_thread + MAX_THREAD)
       t = all_thread;
@@ -59,8 +61,10 @@ thread_schedule(void)
     current_thread = next_thread;
     /* YOUR CODE HERE
      * Invoke thread_switch to switch from t to next_thread:
-     * thread_switch(??, ??);
      */
+    
+    thread_switch((uint64)t->stack+STACK_SIZE-112,(uint64)next_thread->stack+STACK_SIZE-112);
+    
   } else
     next_thread = 0;
 }
@@ -74,7 +78,11 @@ thread_create(void (*func)())
     if (t->state == FREE) break;
   }
   t->state = RUNNABLE;
-  // YOUR CODE HERE
+
+  t->sp = (uint64) (t->stack + STACK_SIZE); //set the top of stack
+  t->sp = t->sp - 120; //create space for registers s0-s11,ra,sp
+  *(uint64 *)(t->sp+8) = (uint64)*func; //save return address to top of stack
+  *(uint64 *)(t->sp+16) = t->sp;
 }
 
 void 

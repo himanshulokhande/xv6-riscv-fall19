@@ -122,7 +122,8 @@ found:
   memset(&p->context, 0, sizeof p->context);
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
-
+  p->intervalElapsed = 0;
+  p->temp = (struct trapframe *)kalloc();
   return p;
 }
 

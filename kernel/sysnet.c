@@ -87,6 +87,85 @@ bad:
 // and writing for network sockets.
 //
 
+//read sockets
+int
+sockread(struct sock *f,uint64 addr, int n){
+
+  acquire(&f->lock);
+  struct mbufq *p= &f->rxq;
+
+  //check if rxq is empty, if empty sleep
+  while(mbufq_empty(p) == 1){
+    sleep(f,&f->lock);
+  }
+  //obtain mbuf
+  struct mbuf *head = mbufq_pophead(p);
+  
+  struct proc *process = myproc();
+  //copy data from head->head to addr
+  if(copyout(process->pagetable,addr,head->head,head->len) == -1){
+    return -1;
+  }
+  n=head->len;
+  mbuffree(head);
+  release(&f->lock);
+
+  return n;
+}
+
+//write sockets
+int
+sockwrite(struct sock *f,uint64 addr,int n){
+  acquire(&lock);
+  //allocate new mbuf
+  struct mbuf *b = mbufalloc(MBUF_DEFAULT_HEADROOM);
+  
+  struct proc *p = myproc();
+  
+  //update m->len and return pointer to it
+  char *buf = mbufput(b,n);
+  
+  //copy data to buf from addr
+  if(copyin(p->pagetable,buf,addr,n) == -1){
+    return -1;
+  }
+  net_tx_udp(b,f->raddr,f->lport,f->rport);
+  release(&lock);
+  
+  return n;
+}
+
+//close sockets
+void sockclose(struct sock *f){
+  acquire(&lock);
+   
+  acquire(&f->lock);
+  struct mbufq *buf = &f->rxq;
+  //check if queue is empty, if not empty free all the packets
+  while(mbufq_empty(buf)!=1){
+    struct mbuf *head=mbufq_pophead(buf);
+    mbuffree(head);
+  }
+  release(&f->lock);
+  struct sock *p=sockets;
+  if(p==f){
+    sockets=sockets->next;
+    kfree(f);
+  }else{
+    while(p){
+      if(p->next == f){
+        acquire(&p->lock);
+        p->next = f->next;
+        kfree(f);
+        release(&p->lock);
+        break;
+      }
+    p=p->next;
+    }
+  }
+  release(&lock);
+}
+
 // called by protocol handler layer to deliver UDP packets
 void
 sockrecvudp(struct mbuf *m, uint32 raddr, uint16 lport, uint16 rport)
@@ -98,5 +177,19 @@ sockrecvudp(struct mbuf *m, uint32 raddr, uint16 lport, uint16 rport)
   // any sleeping reader. Free the mbuf if there are no sockets
   // registered to handle it.
   //
+  acquire(&lock);
+  struct sock *pos = sockets;
+  while(pos){
+    if(pos->raddr == raddr && pos->lport == lport && pos->rport == rport){
+      acquire(&pos->lock);
+      mbufq_pushtail(&pos->rxq,m);
+      release(&pos->lock);
+      wakeup(pos);
+      release(&lock);
+      return;
+    }
+    pos=pos->next;
+  }
   mbuffree(m);
+  release(&lock);
 }
